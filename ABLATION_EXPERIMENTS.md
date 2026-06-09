@@ -8,7 +8,7 @@ questions about SAIF.
 Run:
 
 ```bash
-python run_targeted_ablation.py
+python scripts/run_targeted_ablation.py
 ```
 
 This evaluates the two sparse settings:
@@ -39,7 +39,7 @@ two-stage tuning, only uses region size, or only learns generic balance cues.
 Run:
 
 ```bash
-python run_finetune_ablation.py
+python scripts/run_finetune_ablation.py
 ```
 
 This smaller table compares only:
@@ -60,7 +60,7 @@ candidate-region fine-tuning stage.
 Run:
 
 ```bash
-python run_order_robustness.py
+python scripts/run_order_robustness.py
 ```
 
 This evaluates Full SAIF under the original candidate order and three shuffled
@@ -82,13 +82,13 @@ This ablation requires new checkpoints because the architecture changes.
 Train:
 
 ```bash
-python train_no_layernorm.py
+python scripts/train_no_layernorm.py
 ```
 
 Evaluate:
 
 ```bash
-python run_no_layernorm_ablation.py
+python scripts/run_no_layernorm_ablation.py
 ```
 
 Outputs:

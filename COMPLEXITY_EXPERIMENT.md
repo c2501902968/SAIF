@@ -32,7 +32,7 @@ startup, data loading, candidate construction, and testing.
 Run the three-checkpoint profile on the two highly sparse settings:
 
 ```bash
-python run_complexity_profile.py
+python scripts/run_complexity_profile.py
 ```
 
 This evaluates:
@@ -44,7 +44,7 @@ This evaluates:
 To summarize existing logs without rerunning:
 
 ```bash
-python summarize_complexity_profile.py
+python scripts/summarize_complexity_profile.py
 ```
 
 Outputs:

@@ -1,9 +1,8 @@
 #!/usr/bin/env python
-"""Unified Python entry point for the legacy shell scripts.
+"""Unified Python entry point for experiment tasks.
 
-The root-level ``*.sh`` files in this repository are now thin compatibility
-wrappers around tasks in this file. Use ``python scripts/run_batches.py list``
-to see the available tasks.
+Use ``python scripts/run_batches.py list`` to see the available tasks. Thin
+Python entrypoints in ``scripts/`` call into this shared runner.
 """
 
 from __future__ import annotations

@@ -14,7 +14,7 @@ original implementation structure for compatibility.
 - RevFilter baseline evaluation workflows
 - Baseline comparisons with MLP, NGCF, and LightGCN
 - Top-k, sparsity, cost, ablation, and case-study experiments
-- Python wrappers for the legacy shell scripts
+- Python experiment entrypoints collected under `scripts/`
 - Log parsers, summary generators, and plotting utilities
 
 ## Repository Structure
@@ -85,7 +85,7 @@ Preview commands without running expensive jobs:
 
 ```bash
 python scripts/run_batches.py run-anchor-table2 --dry-run
-python run_anchor_topk.py --dry-run
+python scripts/run_anchor_topk.py --dry-run
 ```
 
 Run SAIF / AnchorRevFilter Table 2 style evaluation:
@@ -107,8 +107,8 @@ Run top-k experiments:
 python scripts/run_batches.py run-official-topk
 python scripts/run_batches.py run-anchor-topk
 python scripts/run_batches.py compare-anchor-official-topk
-python draw_topk-hr.py
-python draw_topk-ncdg.py
+python scripts/draw_topk-hr.py
+python scripts/draw_topk-ncdg.py
 ```
 
 Run sparsity experiments:
@@ -117,31 +117,23 @@ Run sparsity experiments:
 python scripts/run_batches.py run-official-sparsity
 python scripts/run_batches.py run-anchor-sparsity
 python scripts/run_batches.py compare-anchor-official-sparsity
-python draw_sparsity.py
-python draw_sparsity-h.py
+python scripts/draw_sparsity.py
+python scripts/draw_sparsity-h.py
 ```
 
 Run the three-checkpoint complexity profile:
 
 ```bash
-python run_complexity_profile.py
+python scripts/run_complexity_profile.py
 ```
 
-## Script Wrappers
+## Script Entrypoints
 
-The old `.sh` files are kept as compatibility wrappers. Matching `.py` wrappers
-are available for Windows and environments without Bash.
-
-All wrappers call the shared runner:
+Experiment entrypoint scripts are kept in `scripts/` so the repository root
+stays focused on the paper artifact. Most wrappers call the shared runner:
 
 ```bash
 python scripts/run_batches.py <task>
-```
-
-The full mapping is documented in:
-
-```text
-scripts/SH_SCRIPTS.md
 ```
 
 ## Reproduction

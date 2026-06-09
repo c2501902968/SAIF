@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="${SCRIPT_DIR}"
+if [ "$(basename "${ROOT_DIR}")" = "scripts" ]; then
+  ROOT_DIR="$(dirname "${ROOT_DIR}")"
+fi
+cd "${ROOT_DIR}"
+
 PHASE=${PHASE:-all}          # train_extra / eval / all
 POOLS=${POOLS:-"sum"}        # use "sum mean" if you also want mean
 SEEDS=${SEEDS:-"0 1 2"}

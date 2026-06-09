@@ -101,11 +101,11 @@ Preview expensive commands before running them:
 
 ```bash
 python scripts/run_batches.py run-anchor-table2 --dry-run
-python run_anchor_topk.py --dry-run
+python scripts/run_anchor_topk.py --dry-run
 ```
 
-Windows users can run the `.py` wrappers. Linux/macOS users can also use the
-compatible `.sh` wrappers.
+The convenience Python entrypoints live in `scripts/`; the shared task runner is
+`scripts/run_batches.py`.
 
 ## 6. Reproduce Main Table
 
@@ -137,8 +137,8 @@ python scripts/run_batches.py run-baselines-table2
 python scripts/run_batches.py run-official-topk
 python scripts/run_batches.py run-anchor-topk
 python scripts/run_batches.py compare-anchor-official-topk
-python draw_topk-hr.py
-python draw_topk-ncdg.py
+python scripts/draw_topk-hr.py
+python scripts/draw_topk-ncdg.py
 ```
 
 Expected outputs:
@@ -156,8 +156,8 @@ figures/topk_ndcg_curve.png
 python scripts/run_batches.py run-official-sparsity
 python scripts/run_batches.py run-anchor-sparsity
 python scripts/run_batches.py compare-anchor-official-sparsity
-python draw_sparsity.py
-python draw_sparsity-h.py
+python scripts/draw_sparsity.py
+python scripts/draw_sparsity-h.py
 ```
 
 Expected outputs:
@@ -174,17 +174,17 @@ figures/sparsity_hr_curve.png
 Anchor-only evaluation:
 
 ```bash
-python anchor-only.py
-python evaluate_anchor_only.py
+python scripts/anchor-only.py
+python scripts/evaluate_anchor_only.py
 ```
 
 Ablation studies:
 
 ```bash
-python run_xiaorong.py
-python run_xiaorong_bu.py
-python run_targeted_ablation.py
-python run_order_robustness.py
+python scripts/run_xiaorong.py
+python scripts/run_xiaorong_bu.py
+python scripts/run_targeted_ablation.py
+python scripts/run_order_robustness.py
 ```
 
 See `ABLATION_EXPERIMENTS.md` for the targeted reviewer-control ablations,
@@ -194,10 +194,10 @@ balance features, shuffled candidate order, and the optional no-LayerNorm run.
 Cost and complexity evaluation:
 
 ```bash
-python run_official_cost.py
-python run_anchor_cost.py
-python jiexi_cost.py
-python run_complexity_profile.py
+python scripts/run_official_cost.py
+python scripts/run_anchor_cost.py
+python scripts/jiexi_cost.py
+python scripts/run_complexity_profile.py
 ```
 
 `run_complexity_profile.py` runs Official RevFilter and SAIF over three
@@ -208,8 +208,8 @@ parameter count, scored-region count, and search-workload mean+/-std.
 Case study:
 
 ```bash
-python run_case_study.py
-python draw_case_study_43.py
+python scripts/run_case_study.py
+python scripts/draw_case_study_43.py
 ```
 
 ## 10. Expected Output Files
