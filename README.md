@@ -147,27 +147,6 @@ Use `REPRODUCE.md` for a full clean-clone workflow, including:
 - top-k and sparsity reproduction
 - optional ablation, cost, and case-study runs
 
-## Citation And Upstream Credit
-
-This repository is based on the RevTrack codebase:
-
-```bibtex
-@inproceedings{song2024revtrack,
-  title={Identifying Money Laundering Subgraphs on the Blockchain},
-  author={Kiwhan Song and Mohamed Ali Dhraief and Muhua Xu and Locke Cai and Xuhao Chen and Arvind and Jie Chen},
-  booktitle={Proceedings of the Fifth ACM International Conference on AI in Finance},
-  year={2024}
-}
-```
-
-The original RevTrack README has been preserved as
-`README_ORIGINAL_REVTRACK.md`.
-
-This repo is forked from Boyuan Chen's research template repo
-`https://github.com/buoyancy99/research-template`. By directly reading the
-template repo's README, you can learn how this repo is structured and how to
-use it.
-
 ## License
 
 See `LICENSE` for details.
