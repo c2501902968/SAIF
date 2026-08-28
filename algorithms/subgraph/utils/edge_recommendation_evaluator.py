@@ -2,6 +2,7 @@ from typing import Sequence, Tuple
 import math
 import torch
 import numpy as np
+from datasets.elliptic.data import unique_edge_pairs
 
 
 class EdgeRecommendationEvaluator:
@@ -50,10 +51,9 @@ class EdgeRecommendationEvaluator:
         """
         Evaluate one recommendation instance.
         """
-        gt_edges_batch = gt_edges_batch.t().detach().cpu().tolist()
         # compute HR@K
         pred_edges = set(top_k_edges_batch)
-        gt_edges = set(tuple(edge) for edge in gt_edges_batch)
+        gt_edges = unique_edge_pairs(gt_edges_batch)
         num_hits = len(pred_edges.intersection(gt_edges))
         hit_ratio = num_hits / len(gt_edges)
 

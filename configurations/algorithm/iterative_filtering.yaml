@@ -15,5 +15,6 @@ candidate_order_seed: 0
 
 model:
   anchor_feature_mode: full
-  anchor_fusion_mode: full
+  anchor_control_mode: normal
+  anchor_input_dim: 6
   anchor_normalization: layernorm

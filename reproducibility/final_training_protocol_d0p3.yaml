@@ -1,0 +1,49 @@
+artifact_type: frozen_reproduction_protocol
+not_a_runtime_resolved_config: true
+formal_runtime_source: cloud_gpu
+backbone:
+  input_dim: 43
+  hidden_dim: 128
+  num_layers: 1
+  dropout: 0.3
+  pool: max
+  activation: ELU
+search:
+  keep_multiplier_alpha: 1.5
+  train_with_1_1: false
+  candidate_order: original
+  candidate_order_seed: 0
+augmentation:
+  gamma: 0.4
+  min_merge: 1
+  max_merge: 20
+methods:
+  RevFilter:
+    use_anchor_features: false
+  SAIF:
+    use_anchor_features: true
+    anchor_feature_mode: full
+    anchor_input_dim: 6
+    anchor_normalization: layernorm
+    anchor_control_mode: normal
+training_seeds: [0, 1, 2]
+selection:
+  monitor: validation/f1
+  mode: max
+  test_during_training: false
+stage1:
+  tasks: [training]
+  augment_enabled: false
+  max_epochs: 150
+  early_stopping: true
+  patience: 30
+stage2:
+  tasks: [training]
+  initialize_from: corresponding_stage1_checkpoint
+  augment_enabled: true
+  max_epochs: 300
+  early_stopping: false
+logging:
+  wandb_mode: offline
+  training_num_workers: 0
+  validation_num_workers: 0

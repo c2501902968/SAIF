@@ -1,0 +1,29 @@
+artifact_type: frozen_control_protocol
+not_a_runtime_resolved_config: true
+formal_runtime_source: cloud_gpu
+launcher: scripts/run_final_efficiency_receiver_balanced.py
+phase: receiver-balanced
+checkpoint_source: checkpoints/final_revfilter_saif_128_l1_d0p3/{method}/seed{training_seed}_stage2.ckpt
+methods: [RevFilter, SAIF]
+training_seeds: [0, 1, 2]
+evaluation_seed: 0
+instances_per_setting: 256
+settings: [10+1000@100, 10+10000@100]
+candidate_pool: balanced_receivers
+candidate_order: original
+candidate_order_seed: 0
+augment_enabled: false
+tasks: [test]
+batch_size: 16
+num_workers: 0
+backbone: 128/1/0.3/max/ELU
+search_alpha: 1.5
+paired_analysis:
+  metrics: [HR, NDCG]
+  test: two-sided_wilcoxon_signed_rank
+  average_training_runs_per_sample_first: true
+  multiple_testing: BH_all_4
+integrity:
+  matched_candidates_across_methods: required
+  matched_candidates_across_training_seeds: required
+  test_derived_model_selection: false

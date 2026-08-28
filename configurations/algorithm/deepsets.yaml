@@ -2,9 +2,12 @@ defaults:
   - base_subgraph_algo
 
 model:
-  num_layers: 2
+  num_layers: 1
   hidden_dim: 128
-  dropout: 0.2
+  dropout: 0.1
   activation: ELU
   pool: max
-
+  scorer_hidden_dim: 128
+  scorer_dropout: 0.2
+  representation_normalization: none
+  representation_noise_std: 0.0

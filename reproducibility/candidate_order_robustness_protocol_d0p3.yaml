@@ -1,0 +1,44 @@
+artifact_type: frozen_robustness_protocol
+not_a_runtime_resolved_config: true
+formal_runtime_source: cloud_gpu
+launcher: scripts/run_final_candidate_order_robustness.py
+checkpoint_source: checkpoints/final_revfilter_saif_128_l1_d0p3/{method}/seed{training_seed}_stage2.ckpt
+methods: [RevFilter, SAIF]
+training_seeds: [0, 1, 2]
+evaluation_seed: 0
+instances_per_setting: 256
+settings: [10+1000@100, 10+10000@100]
+candidate_pool: official
+order_conditions:
+  original:
+    candidate_order: original
+    order_seed: 0
+  shuffle_1:
+    candidate_order: shuffle
+    order_seed: 1
+  shuffle_2:
+    candidate_order: shuffle
+    order_seed: 2
+  shuffle_3:
+    candidate_order: shuffle
+    order_seed: 3
+evaluation_jobs: 48
+instance_records: 12288
+backbone: 128/1/0.3/max/ELU
+search_alpha: 1.5
+paired_analysis:
+  saif_vs_revfilter_tests: 16
+  order_interaction_tests: 12
+  test: two-sided_wilcoxon_signed_rank
+  average_training_runs_per_sample_first: true
+  multiple_testing:
+    saif_vs_revfilter: BH_all_16
+    interactions: BH_all_12
+hash_audit:
+  sender_order_hash: required
+  receiver_order_hash: required
+  candidate_membership_hash: required
+  positive_pair_hash: required
+  matched_order_across_methods: required
+  matched_order_across_training_seeds: required
+model_selection_from_test: false

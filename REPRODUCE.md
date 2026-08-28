@@ -1,260 +1,203 @@
-# Reproduce Experiments
+# Reproduce the final SAIF experiments
 
-This document describes how to reproduce the main experiments from a clean
-GitHub clone.
+This document describes the frozen `128/1/0.3/max/ELU` workflow. It separates
+validation-only model selection, final retraining, TEST evaluation, and
+supporting controls so that TEST results cannot influence model choice.
 
-Large files should not be committed directly to GitHub. Keep code in GitHub and
-host datasets/checkpoints through GitHub Releases, Hugging Face, Zenodo, Google
-Drive, or an institutional file server.
-
-## 1. Clone
+## 1. Clone and install
 
 ```bash
-git clone <your-repo-url>
-cd RevTrack-main
-```
-
-## 2. Create Environment
-
-Python 3.10 is recommended:
-
-```bash
-conda create -n revtrack python=3.10
-conda activate revtrack
+git clone https://github.com/c2501902968/SAIF.git
+cd SAIF
+conda create -n saif python=3.12
+conda activate saif
 pip install -r requirements.txt
 ```
 
-Most batch commands already use offline Weights & Biases logging:
+The recorded formal environment was Python 3.12.3, PyTorch 2.5.1+cu124, CUDA
+12.4, and an NVIDIA RTX 4090. Every final launcher writes its own environment
+record, so a compatible CUDA environment may be used without silently claiming
+the reference environment.
 
-```bash
-wandb.mode=offline
-```
+## 2. Data layout and split semantics
 
-## 3. Download Data
-
-Download the Elliptic / Elliptic2 preprocessing assets and place them here:
+Required Elliptic assets:
 
 ```text
 data/elliptic/raw/data_df.pkl
 data/elliptic/raw/node_idx_map.pt
-data/elliptic/raw/raw_emb.pt
+data/elliptic/processed/data.pt
+data/elliptic/processed/edge_index.pt
+data/elliptic/processed/emb.pt
+data/elliptic/processed/mask.pt
 ```
 
-If you provide preprocessed files, place them under:
+The frozen split contract is:
 
 ```text
-data/elliptic/processed/
+mask == 0  training
+mask == 1  validation
+mask == 2  test
 ```
 
-Add the real data URL to your GitHub README or Release page:
+Run the provenance audit before expensive jobs:
+
+```bash
+python scripts/audit_split_mask_provenance.py
+```
+
+## 3. VAL-only Shared DeepSets selection
+
+The final sweep contains 12 configurations and three seeds per configuration.
+It ranks configurations only by mean `validation/prauc`; its source scan rejects
+TEST-derived selection logic.
+
+```bash
+CUDA_VISIBLE_DEVICES=0 python scripts/run_deepsets_val_only_gpu.py --dry-run
+CUDA_VISIBLE_DEVICES=0 python scripts/run_deepsets_val_only_gpu.py
+CUDA_VISIBLE_DEVICES=0 python scripts/run_deepsets_val_only_gpu.py --audit-only
+```
+
+Expected selection:
 
 ```text
-Data download: <replace-with-your-data-url>
+hidden=128, layers=1, dropout=0.3, pool=max, activation=ELU
 ```
 
-## 4. Download Checkpoints
+Outputs are written under `results/deepsets_val_only_gpu/` and include the raw
+36-run table, ranking, environment, dependency snapshot, and selection audit.
 
-To reproduce evaluation tables and plots, download checkpoints into this
-layout:
+MLP and NGCF use the same selection/evaluation separation:
+
+```bash
+python scripts/run_mlp_val_only.py
+python scripts/run_mlp_val_selected_table1.py
+python scripts/run_ngcf_val_only.py
+python scripts/run_ngcf_val_selected_table1.py
+```
+
+Relevant audit entrypoints are `audit_deepsets_provenance.py`,
+`audit_mlp_provenance.py`, `audit_ngcf_provenance.py`, and
+`audit_lightgcn_val_table1.py`.
+
+## 4. Final RevFilter and SAIF retraining
+
+The final launcher freezes all model/search hyperparameters, trains RevFilter
+and full SAIF independently for seeds 0, 1, and 2 in two stages, and only then
+evaluates TEST. It is restartable and validates existing stage markers and
+checkpoint hashes before reusing them.
+
+```bash
+set -o pipefail
+CUDA_VISIBLE_DEVICES=0 python scripts/run_final_revfilter_saif_main.py \
+  2>&1 | tee final_revfilter_saif_128_l1_d0p3_launcher.log
+```
+
+Expected artifact roots:
 
 ```text
-checkpoints/
-|-- RevTrack/
-|   |-- 0_tuned.ckpt
-|   |-- 1_tuned.ckpt
-|   `-- 2_tuned.ckpt
-|-- AnchorRevFilter/
-|   |-- tuned_seed0.ckpt
-|   |-- tuned_seed1.ckpt
-|   `-- tuned_seed2.ckpt
-|-- MLP/
-|   |-- 0.ckpt
-|   |-- 1.ckpt
-|   `-- 2.ckpt
-|-- NGCF/
-|   |-- 0.ckpt
-|   |-- 1.ckpt
-|   `-- 2.ckpt
-`-- LightGCN/
-    |-- 0.ckpt
-    |-- 1.ckpt
-    `-- 2.ckpt
+checkpoints/final_revfilter_saif_128_l1_d0p3/
+outputs/final_revfilter_saif_128_l1_d0p3/
+results/final_revfilter_saif_128_l1_d0p3/
 ```
 
-Official RevTrack checkpoints can be linked from the original project README.
-For AnchorRevFilter and ablation checkpoints generated in this repository, add
-your own release/download URL:
+The final integrity audit must report:
 
 ```text
-Checkpoint download: <replace-with-your-checkpoint-url>
+48 aggregate records
+12,288 instance records
+6 final stage-2 models
+candidate hash assertion = PASS
+TEST exclusion during training = PASS
+GPU assertion for 60 jobs = PASS
 ```
 
-## 5. Verify Setup
-
-List all available tasks:
+Inspect:
 
 ```bash
-python scripts/run_batches.py list
+cat results/final_revfilter_saif_128_l1_d0p3/main_table_summary.csv
+cat results/final_revfilter_saif_128_l1_d0p3/integrity.json
+cat results/final_revfilter_saif_128_l1_d0p3/checkpoint_provenance.json
 ```
 
-Preview expensive commands before running them:
+## 5. Paired statistics
+
+`scripts/paired_instance_wilcoxon_bh.py` performs two-sided paired Wilcoxon
+signed-rank tests. It first verifies matched settings, sample identifiers, and
+three independently trained runs; then it averages those runs per instance,
+tests HR and NDCG, and applies BH correction.
 
 ```bash
-python scripts/run_batches.py run-anchor-table2 --dry-run
-python scripts/run_anchor_topk.py --dry-run
+python scripts/paired_instance_wilcoxon_bh.py \
+  --a <revfilter-instance-csv> \
+  --b <saif-instance-csv> \
+  --a-name RevFilter --b-name SAIF \
+  --expected-runs 3 --expected-samples 256 --expected-settings 8 \
+  --bh-scope all \
+  --out results/paired_main_wilcoxon_bh.csv
 ```
 
-The convenience Python entrypoints live in `scripts/`; the shared task runner is
-`scripts/run_batches.py`.
-
-## 6. Reproduce Main Table
-
-Run official RevFilter and AnchorRevFilter evaluations:
+Run the statistical regression tests with:
 
 ```bash
-python scripts/run_batches.py run-official-table2
-python scripts/run_batches.py run-anchor-table2
-python scripts/run_batches.py compare-anchor-official-table2
+python -m unittest tests.test_paired_instance_wilcoxon_bh -v
 ```
 
-Expected outputs:
+## 6. Efficiency and receiver-balanced control
 
-```text
-logs-official-revfilter-table2/
-logs-anchor-revfilter-table2/
-logs-anchor-revfilter-table2/anchor_vs_official_delta.md
-```
-
-Run MLP, NGCF, and LightGCN baselines:
+These evaluations reuse the six frozen final stage-2 checkpoints and only run
+`10+1000@100` and `10+10000@100`.
 
 ```bash
-python scripts/run_batches.py run-baselines-table2
+CUDA_VISIBLE_DEVICES=0 python scripts/run_final_efficiency_receiver_balanced.py --phase all --dry-run
+CUDA_VISIBLE_DEVICES=0 python scripts/run_final_efficiency_receiver_balanced.py --phase all
+CUDA_VISIBLE_DEVICES=0 python scripts/run_final_efficiency_receiver_balanced.py --phase all --audit-only
 ```
 
-## 7. Reproduce Top-k Experiments
+Efficiency compares actual scored regions and encoded nodes, not merely wall
+clock time. Receiver-balanced evaluation asserts identical receiver density
+across methods and writes direct official-versus-balanced delta comparisons.
+
+## 7. Ablation and pooling sensitivity
+
+The ablation is a two-factor design over state conditioning and Stage-2
+fine-tuning. Pooling sensitivity compares max, mean, and sum while holding the
+rest of the architecture fixed.
 
 ```bash
-python scripts/run_batches.py run-official-topk
-python scripts/run_batches.py run-anchor-topk
-python scripts/run_batches.py compare-anchor-official-topk
-python scripts/draw_topk-hr.py
-python scripts/draw_topk-ncdg.py
+CUDA_VISIBLE_DEVICES=0 python scripts/run_final_ablation_pooling.py --phase all --dry-run
+CUDA_VISIBLE_DEVICES=0 python scripts/run_final_ablation_pooling.py --phase ablation
+CUDA_VISIBLE_DEVICES=0 python scripts/run_final_ablation_pooling.py --phase pooling
+CUDA_VISIBLE_DEVICES=0 python scripts/run_final_ablation_pooling.py --phase all --audit-only
 ```
 
-Expected outputs:
+The collector writes both within-pooling SAIF-versus-RevFilter tests and direct
+interaction tests against max pooling. See
+[`ABLATION_POOLING_GPU_RUN_INSTRUCTIONS.md`](ABLATION_POOLING_GPU_RUN_INSTRUCTIONS.md).
 
-```text
-logs-official-topk/
-logs-anchor-topk/
-figures/topk_hr_curve.png
-figures/topk_ndcg_curve.png
-```
+## 8. Candidate-order robustness
 
-## 8. Reproduce Sparsity Experiments
+This defense experiment reuses the frozen checkpoints and matched main-table
+instances. Candidate membership stays fixed while sender and receiver order are
+independently shuffled with deterministic seeds.
 
 ```bash
-python scripts/run_batches.py run-official-sparsity
-python scripts/run_batches.py run-anchor-sparsity
-python scripts/run_batches.py compare-anchor-official-sparsity
-python scripts/draw_sparsity.py
-python scripts/draw_sparsity-h.py
+CUDA_VISIBLE_DEVICES=0 python scripts/run_final_candidate_order_robustness.py --dry-run
+CUDA_VISIBLE_DEVICES=0 python scripts/run_final_candidate_order_robustness.py
+CUDA_VISIBLE_DEVICES=0 python scripts/run_final_candidate_order_robustness.py --audit-only
 ```
 
-Expected outputs:
+The audit requires membership/positive-pair hashes to remain invariant and
+order hashes to change for shuffled conditions. See
+[`CANDIDATE_ORDER_GPU_RUN_INSTRUCTIONS.md`](CANDIDATE_ORDER_GPU_RUN_INSTRUCTIONS.md).
 
-```text
-logs-official-sparsity/
-logs-anchor-sparsity/
-figures/sparsity_ndcg_curve.png
-figures/sparsity_hr_curve.png
-```
+## 9. What is and is not versioned
 
-## 9. Optional Experiments
+Source code, configs, tests, and protocol manifests are versioned. Generated
+checkpoints, full Hydra outputs, launcher logs, instance-level result bundles,
+and environment snapshots are kept outside the source commit. Archive those
+artifacts together with their `integrity.json` and checkpoint SHA-256 records in
+a release or long-term research repository.
 
-Anchor-only evaluation:
-
-```bash
-python scripts/anchor-only.py
-python scripts/evaluate_anchor_only.py
-```
-
-Ablation studies:
-
-```bash
-python scripts/run_xiaorong.py
-python scripts/run_xiaorong_bu.py
-python scripts/run_targeted_ablation.py
-python scripts/run_order_robustness.py
-```
-
-See `ABLATION_EXPERIMENTS.md` for the targeted reviewer-control ablations,
-including w/o fine-tuning, region-size features, removed sparsity proxy, removed
-balance features, shuffled candidate order, and the optional no-LayerNorm run.
-
-Cost and complexity evaluation:
-
-```bash
-python scripts/run_official_cost.py
-python scripts/run_anchor_cost.py
-python scripts/jiexi_cost.py
-python scripts/run_complexity_profile.py
-```
-
-`run_complexity_profile.py` runs Official RevFilter and SAIF over three
-checkpoints on `10+1000@100` and `10+10000@100`, then writes
-`logs-complexity-profile/complexity_profile_summary.md` with runtime,
-parameter count, scored-region count, and search-workload mean+/-std.
-
-Case study:
-
-```bash
-python scripts/run_case_study.py
-python scripts/draw_case_study_43.py
-```
-
-## 10. Expected Output Files
-
-Most evaluation folders contain:
-
-```text
-revfilter_raw.csv
-revfilter_summary.csv
-revfilter_summary.md
-```
-
-Comparison tasks generate markdown tables such as:
-
-```text
-anchor_vs_official_delta.md
-anchor_vs_official_topk_delta.md
-anchor_vs_official_sparsity_delta.md
-```
-
-## 11. Reproducibility Notes
-
-- Evaluation tasks usually use `seed=0` for test-time sampling.
-- Multi-checkpoint summaries generally average over checkpoints/seeds `0`,
-  `1`, and `2`.
-- GPU is recommended for full reproduction. CPU runs can be slow.
-- `logs-*`, `outputs/`, `checkpoints/`, and `data/` are ignored by
-  `.gitignore` because they are large or generated.
-- Always use `--dry-run` before expensive runs to inspect exact commands.
-
-## 12. Troubleshooting
-
-If `python` is not found, use the full interpreter path:
-
-```bash
-/path/to/python scripts/run_batches.py list
-```
-
-If a checkpoint is missing, verify that the file path matches the layout in
-section 4.
-
-If data loading fails, verify that required files are under `data/elliptic/`.
-
-If Weights & Biases prompts for login, keep `wandb.mode=offline` or run:
-
-```bash
-wandb offline
-```
+The exact handoff inventory is documented in
+[`FINAL_REPRODUCIBILITY_FILES.md`](FINAL_REPRODUCIBILITY_FILES.md).

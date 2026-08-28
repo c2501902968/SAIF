@@ -29,7 +29,7 @@ startup, data loading, candidate construction, and testing.
 
 ## How To Run
 
-Run the three-checkpoint profile on the two highly sparse settings:
+Run the three-run profile on the two highly sparse settings:
 
 ```bash
 python scripts/run_complexity_profile.py
@@ -53,7 +53,7 @@ Outputs:
 - `logs-complexity-profile/complexity_profile_summary.csv`
 - `logs-complexity-profile/complexity_profile_summary.md`
 
-All summary values are reported as `mean+/-std` over three checkpoints.
+All summary values are reported as `mean+/-std` over three independently trained runs.
 
 ## Paper Reporting
 

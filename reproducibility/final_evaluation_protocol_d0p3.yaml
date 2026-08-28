@@ -1,0 +1,36 @@
+artifact_type: frozen_reproduction_protocol
+not_a_runtime_resolved_config: true
+formal_runtime_source: cloud_gpu
+checkpoint_source: checkpoints/final_revfilter_saif_128_l1_d0p3/{method}/seed{training_seed}_stage2.ckpt
+methods: [RevFilter, SAIF]
+training_seeds: [0, 1, 2]
+evaluation_seed: 0
+instances_per_setting: 256
+candidate_pool: official
+candidate_order: original
+candidate_order_seed: 0
+augment_enabled: false
+tasks: [test]
+test_during_training: false
+batch_size: 16
+num_workers: 0
+backbone:
+  input_dim: 43
+  hidden_dim: 128
+  num_layers: 1
+  dropout: 0.3
+  pool: max
+  activation: ELU
+search:
+  keep_multiplier_alpha: 1.5
+settings:
+  - 1+5@1
+  - 1+10@1
+  - 1+10@3
+  - 1+100@3
+  - 3+100@10
+  - 3+1000@10
+  - 10+1000@100
+  - 10+10000@100
+metrics: [HR, NDCG]
+model_selection_from_test: false

@@ -1,6 +1,9 @@
 import math
+import hashlib
+import json
 import numpy as np
 import time
+from pathlib import Path
 from typing import List
 from functools import partial
 import torch
@@ -24,6 +27,12 @@ class IterativeFilteringAlgo(SubgraphAlgo):
         self.profile_search = getattr(cfg, "profile_search", False)
         self.candidate_order = getattr(cfg, "candidate_order", "original")
         self.candidate_order_seed = int(getattr(cfg, "candidate_order_seed", 0))
+        self.audit_output_path = getattr(cfg, "audit_output_path", None)
+        self.audit_method = str(getattr(cfg, "audit_method", ""))
+        self.audit_training_seed = int(getattr(cfg, "audit_training_seed", -1))
+        self.audit_eval_seed = int(getattr(cfg, "audit_eval_seed", -1))
+        self.audit_setting = str(getattr(cfg, "audit_setting", ""))
+        self._audit_instance_counter = 0
         if self.candidate_order not in {"original", "shuffle"}:
             raise ValueError(
                 f"Unknown candidate_order={self.candidate_order}; "
@@ -136,6 +145,11 @@ class IterativeFilteringAlgo(SubgraphAlgo):
             for group in groups
         ]
 
+        if self.audit_output_path:
+            self._write_instance_audit(
+                senders, receivers, illicit_edge_indices, top_k_edges
+            )
+
         hit_ratio, ndcg = self.evaluator(top_k_edges, illicit_edge_indices)
 
         log_fn = partial(
@@ -156,6 +170,76 @@ class IterativeFilteringAlgo(SubgraphAlgo):
                 search_elapsed_sec,
                 batch_size,
             )
+
+    def _write_instance_audit(
+        self, senders, receivers, illicit_edge_indices, top_k_edges
+    ) -> None:
+        """Append per-instance metrics without changing the evaluator path."""
+        output_path = Path(str(self.audit_output_path))
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        records = []
+        for sender_ids, receiver_ids, gt_edges, predicted in zip(
+            senders, receivers, illicit_edge_indices, top_k_edges
+        ):
+            metrics = self.evaluator.evaluate_instance(predicted, gt_edges)
+            sender_order = [
+                int(value) for value in sender_ids.detach().cpu().tolist()
+            ]
+            receiver_order = [
+                int(value) for value in receiver_ids.detach().cpu().tolist()
+            ]
+            positive_pairs = sorted(
+                [int(edge[0]), int(edge[1])]
+                for edge in gt_edges.t().detach().cpu().tolist()
+            )
+            canonical = {
+                "senders": sorted(sender_order),
+                "receivers": sorted(receiver_order),
+                "positive_edges": positive_pairs,
+            }
+            membership = {
+                "senders": canonical["senders"],
+                "receivers": canonical["receivers"],
+            }
+
+            def stable_hash(value) -> str:
+                return hashlib.sha256(
+                    json.dumps(
+                        value, separators=(",", ":"), sort_keys=True
+                    ).encode("utf-8")
+                ).hexdigest()
+
+            candidate_hash = hashlib.sha256(
+                json.dumps(canonical, separators=(",", ":"), sort_keys=True).encode("utf-8")
+            ).hexdigest()
+            index = self._audit_instance_counter
+            self._audit_instance_counter += 1
+            records.append(
+                {
+                    "method": self.audit_method,
+                    "training_seed": self.audit_training_seed,
+                    "setting": self.audit_setting,
+                    "eval_seed": self.audit_eval_seed,
+                    "sample_index": index,
+                    "sample_id": f"{self.audit_setting}:{index:03d}:{candidate_hash[:16]}",
+                    "candidate_hash": candidate_hash,
+                    "sender_order_hash": stable_hash(sender_order),
+                    "receiver_order_hash": stable_hash(receiver_order),
+                    "candidate_membership_hash": stable_hash(membership),
+                    "positive_pair_hash": stable_hash(positive_pairs),
+                    "num_senders": len(canonical["senders"]),
+                    "num_receivers": len(canonical["receivers"]),
+                    "gt_unique_count": int(metrics["gt_count"]),
+                    "hit_count": int(metrics["hit_count"]),
+                    "HR": float(metrics["HR"]),
+                    "NDCG": float(metrics["NDCG"]),
+                    "hit_ranks": metrics["hit_ranks"],
+                    "predicted_edges": [[int(a), int(b)] for a, b in predicted],
+                }
+            )
+        with output_path.open("a", encoding="utf-8") as handle:
+            for record in records:
+                handle.write(json.dumps(record, sort_keys=True) + "\n")
 
     @staticmethod
     def _init_search_profile(

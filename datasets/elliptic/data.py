@@ -3,6 +3,32 @@ import torch
 from torch_geometric.data import Data
 
 
+def unique_edge_pairs(edge_index: torch.Tensor) -> set[tuple[int, int]]:
+    """Return distinct directed pairs from a 2-by-E edge-index tensor."""
+    if edge_index.numel() == 0:
+        return set()
+    if edge_index.ndim != 2 or edge_index.size(0) != 2:
+        raise ValueError(
+            f"Expected edge_index with shape [2, E], got {tuple(edge_index.shape)}"
+        )
+    return {
+        tuple(int(value) for value in edge)
+        for edge in edge_index.t().detach().cpu().tolist()
+    }
+
+
+def candidate_density(
+    senders: torch.Tensor,
+    receivers: torch.Tensor,
+    positive_edge_index: torch.Tensor,
+) -> float:
+    """Compute unique-positive density over the sender-receiver Cartesian product."""
+    candidate_count = int(senders.numel()) * int(receivers.numel())
+    if candidate_count <= 0:
+        raise ValueError("Candidate density is undefined for an empty candidate space")
+    return len(unique_edge_pairs(positive_edge_index)) / candidate_count
+
+
 class SenderToReceiverData(Data):
     """
     A data object representing a sender-to-receiver bipartite graph.

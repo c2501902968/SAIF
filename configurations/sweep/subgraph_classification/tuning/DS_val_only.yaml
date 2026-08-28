@@ -1,0 +1,55 @@
+name: deepsets_val_only
+program: main.py
+method: grid
+
+# Architecture selection uses the validation counterpart of the original
+# DeepSets training/checkpoint criterion. TEST is excluded from every run.
+metric:
+  goal: maximize
+  name: validation/prauc
+
+parameters:
+  # Historical DeepSets architecture candidates, with pooling fixed by design.
+  algorithm.model.num_layers:
+    values: [1, 2]
+  algorithm.model.hidden_dim:
+    values: [64, 128]
+  algorithm.model.dropout:
+    values: [0.1, 0.2, 0.3]
+  algorithm.model.pool:
+    value: max
+  algorithm.model.activation:
+    value: ELU
+
+  # Three deterministic repetitions; configurations are ranked by mean
+  # validation/prauc across these seeds.
+  seed:
+    values: [0, 1, 2]
+
+  dataset:
+    value: elliptic
+  algorithm:
+    value: deepsets
+  experiment:
+    value: exp_subgraph_classification
+  experiment.tasks:
+    value: [training]
+  experiment.validation.test_during_training:
+    value: false
+  experiment.training.checkpointing.monitor:
+    value: validation/prauc
+  # Data-loading concurrency does not change the examples or the model; zero
+  # workers avoids Windows process-spawn overhead in the local audit.
+  experiment.training.data.num_workers:
+    value: 0
+  experiment.validation.data.num_workers:
+    value: 0
+  wandb.mode:
+    value: online
+
+command:
+  - ${env}
+  - python
+  - ${program}
+  - ${args_no_hyphens}
+  - +name=deepsets_val_only_l${algorithm.model.num_layers}_h${algorithm.model.hidden_dim}_d${algorithm.model.dropout}_s${seed}

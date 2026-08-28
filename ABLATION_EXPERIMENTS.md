@@ -16,7 +16,7 @@ This evaluates the two sparse settings:
 - `10+1000@100`
 - `10+10000@100`
 
-and the following variants over three checkpoints:
+and the following variants over three independently trained runs:
 
 - `full`: Full SAIF with tuned checkpoints.
 - `no_finetune`: Full SAIF pretrain checkpoints without the candidate-region
