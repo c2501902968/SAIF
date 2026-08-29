@@ -1,14 +1,15 @@
 # SAIF
 
-SAIF is a candidate-region search-state conditioning method for RevFilter-style
-subgraph recommendation in anti-money-laundering analysis on blockchain
-transaction graphs. It conditions each candidate-region score on a structural
-summary of that region's current state within the iterative search.
+SAIF is a lightweight candidate-region search-state conditioning mechanism for
+RevFilter-style coarse-to-fine sender–receiver candidate retrieval in
+blockchain anti-money laundering. It conditions each candidate-region score on
+a structural summary of that region's current state within the iterative
+search.
 
 This repository provides the model implementation and reproducibility workflows
 used for the paper, including frozen model selection, training, evaluation,
 statistical testing, efficiency analysis, ablation, pooling sensitivity, and
-robustness experiments.
+candidate-order sensitivity experiments.
 
 ## Frozen paper protocol
 
@@ -48,9 +49,9 @@ Machine-readable specifications are under [`reproducibility/`](reproducibility/)
 6. **Efficiency accounting.** Search-loop time, total process time, parameter
    count, initial candidate pairs, scored regions, encoded nodes, and iteration
    rounds are recorded.
-7. **Boundary and defense experiments.** Receiver-balanced control, two-factor
+7. **Boundary and sensitivity experiments.** Receiver-balanced control, two-factor
    ablation, max/mean/sum pooling sensitivity, and deterministic candidate-order
-   robustness are implemented as audited workflows.
+   sensitivity are implemented as audited workflows.
 8. **Reproducibility records.** Experiment launchers write resolved configurations,
    checkpoint hashes, command manifests, environment metadata, `pip freeze`,
    instance records, and `integrity.json` assertions.

@@ -91,6 +91,11 @@ and full SAIF independently for seeds 0, 1, and 2 in two stages, and only then
 evaluates TEST. It is restartable and validates existing stage markers and
 checkpoint hashes before reusing them.
 
+Stage 1 is trained for at most 150 epochs with validation-based checkpoint
+selection. Stage 2 resumes from the selected Stage-1 checkpoint and runs for
+300 epochs without early stopping, with the best validation checkpoint
+retained. Main matched test instances use evaluation seed 0.
+
 ```bash
 set -o pipefail
 CUDA_VISIBLE_DEVICES=0 python scripts/run_final_revfilter_saif_main.py \
@@ -253,7 +258,7 @@ complete matched-instance audit.
 
 The confirmatory design crosses state conditioning with Stage-2 fine-tuning:
 
-| Variant | State/anchor features | Stage-2 fine-tuning | Checkpoint |
+| Variant | Search-state conditioning | Stage-2 fine-tuning | Checkpoint |
 |---|---:|---:|---|
 | RevFilter-S1 | off | off | frozen RevFilter Stage-1 |
 | RevFilter-S2 | off | on | frozen RevFilter Stage-2 |
@@ -290,7 +295,9 @@ results/final_ablation_128_l1_d0p3/integrity.json
 
 Feature-group variants (`size_only`, `no_density`, `no_balance`) remain
 exploratory because they require new training and introduce a post-hoc
-multiple-testing family.
+multiple-testing family. The legacy internal identifier `no_density` disables
+the inverse-candidate-volume search-granularity proxy; it does not refer to
+suspicious or positive-pair density.
 
 ### 7.2 Pooling sensitivity
 
@@ -302,10 +309,12 @@ training stages:
 2 new pooling operators x 2 methods x 3 seeds x 2 stages = 24
 ```
 
-All max/mean/sum models are evaluated again in 36 jobs. The analysis contains
-12 within-pooling SAIF-versus-RevFilter tests and eight direct interactions of
-the form `(non-max SAIF effect) - (max SAIF effect)`. The interaction tests are
-the direct evidence for representation dependence.
+All max/mean/sum models are evaluated again in 36 jobs. The paper reports the
+12 within-pooling SAIF-versus-RevFilter comparisons. Eight interaction outputs
+of the form `(non-max SAIF effect) - (max SAIF effect)` are retained as
+diagnostic artifacts, but they are not used to support a stronger "7 of 8
+interactions significant" claim. The reported conclusion is a
+representation-dependent conditioning pattern.
 
 ```bash
 CUDA_VISIBLE_DEVICES=0 python scripts/run_final_ablation_pooling.py \
@@ -320,8 +329,8 @@ CUDA_VISIBLE_DEVICES=0 python scripts/run_final_ablation_pooling.py \
 ```
 
 Required integrity counts are 24 new training stages, 36 evaluations, 9,216
-instance records, 12 within-pooling tests, eight interaction tests, and a
-passing candidate-hash assertion. Inspect:
+instance records, 12 reported within-pooling comparisons, eight diagnostic
+interaction outputs, and a passing candidate-hash assertion. Inspect:
 
 ```text
 results/final_pooling_sensitivity_128_l1_d0p3/pooling_summary.csv
@@ -331,9 +340,9 @@ results/final_pooling_sensitivity_128_l1_d0p3/integrity.json
 checkpoints/final_pooling_sensitivity_128_l1_d0p3/
 ```
 
-## 8. Candidate-order robustness
+## 8. Candidate-order sensitivity
 
-This defense experiment reuses the frozen checkpoints and matched main-table
+This sensitivity experiment reuses the frozen checkpoints and matched main-table
 instances. It does not train or select a model. Candidate membership stays
 fixed while sender and receiver order are independently shuffled using seeds 1,
 2, and 3, alongside the original order.
@@ -360,6 +369,10 @@ across methods and training seeds, main-table replication under original order,
 GPU/config assertions, checkpoint provenance, and absence of TEST-derived
 selection.
 
+This experiment evaluates sensitivity under the specified perturbations; it
+does not establish order invariance. Report the stability of the principal NDCG
+pattern together with any observed HR order sensitivity.
+
 Inspect:
 
 ```text
@@ -384,7 +397,8 @@ for the audited `run_final_*` workflows:
 - `run_finetune_ablation.py`: compact tuned-versus-no-fine-tuning comparison;
 - `train_no_layernorm.py` and `run_no_layernorm_ablation.py`: optional
   normalization control requiring new checkpoints;
-- `run_order_robustness.py`: a less strictly audited order experiment;
+- `run_order_robustness.py`: a historical internal filename for a less strictly
+  audited candidate-order sensitivity experiment;
 - `run_complexity_profile.py` and `summarize_complexity_profile.py`: additional
   three-checkpoint complexity workflow.
 
