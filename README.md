@@ -4,14 +4,12 @@ SAIF is a state-aware, anchor-conditioned extension of RevFilter-style
 subgraph recommendation for anti-money-laundering analysis on blockchain
 transaction graphs.
 
-This branch is the final reproducibility-oriented code release. It retains the
-initial paper implementation and adds the frozen model-selection, training,
-evaluation, statistical-testing, efficiency, ablation, pooling, and robustness
-workflows used by the final experiments. See
-[`UPDATES_SINCE_INITIAL_RELEASE.md`](UPDATES_SINCE_INITIAL_RELEASE.md) for the
-file-level change inventory.
+This repository provides the model implementation and reproducibility workflows
+used for the paper, including frozen model selection, training, evaluation,
+statistical testing, efficiency analysis, ablation, pooling sensitivity, and
+robustness experiments.
 
-## Final frozen protocol
+## Frozen paper protocol
 
 - Dataset split masks: `0 = TRN`, `1 = VAL`, `2 = TST`.
 - Shared DeepSets selection metric: validation PR-AUC only; TEST is excluded
@@ -30,18 +28,18 @@ file-level change inventory.
 
 Machine-readable specifications are under [`reproducibility/`](reproducibility/).
 
-## What changed after the initial paper code
+## Implemented components
 
 1. **Anchor-conditioned representation.** The SAIF scorer now supports six
    anchor/state features, feature-group variants, LayerNorm, and deterministic
    zero/shuffle/random controls.
-2. **Correct matched evaluation.** The evaluator distinguishes positive pairs
+2. **Matched evaluation.** The evaluator distinguishes positive pairs
    from positive endpoints, exports per-instance HR/NDCG, and supports official,
    symmetric, and receiver-balanced candidate pools.
 3. **VAL-only selection and provenance.** Dedicated Shared DeepSets, MLP, NGCF,
    and LightGCN audit workflows prevent TEST-derived selection and record the
    selected configuration.
-4. **Frozen final retraining.** A restartable launcher trains RevFilter and SAIF
+4. **Frozen retraining.** A restartable launcher trains RevFilter and SAIF
    for three seeds and evaluates the same eight settings with integrity checks.
 5. **Statistical inference.** The repository includes paired Wilcoxon tests,
    BH correction, effect sizes, tie handling, and unit tests.
@@ -51,7 +49,7 @@ Machine-readable specifications are under [`reproducibility/`](reproducibility/)
 7. **Boundary and defense experiments.** Receiver-balanced control, two-factor
    ablation, max/mean/sum pooling sensitivity, and deterministic candidate-order
    robustness are implemented as audited workflows.
-8. **Reproducibility records.** Final scripts write resolved configurations,
+8. **Reproducibility records.** Experiment launchers write resolved configurations,
    checkpoint hashes, command manifests, environment metadata, `pip freeze`,
    instance records, and `integrity.json` assertions.
 
@@ -63,14 +61,14 @@ configurations/      Hydra configs and VAL-only sweeps
 datasets/            Elliptic data loading and candidate-pool construction
 experiments/         training/evaluation experiment definitions
 reproducibility/     machine-readable frozen protocols
-scripts/             launchers, audits, statistics, and legacy utilities
+scripts/             launchers, audits, statistics, and additional utilities
 tests/               statistical regression tests
 main.py              Hydra entry point
-REPRODUCE.md          end-to-end final workflow
+REPRODUCE.md          end-to-end paper workflow
 ```
 
-Generated checkpoints, Hydra outputs, detailed logs, and final result bundles
-are intentionally not added by this update. Keep them under `checkpoints/`,
+Generated checkpoints, Hydra outputs, detailed logs, and result bundles are not
+versioned. Keep them under `checkpoints/`,
 `outputs/`, and `results/`; the launchers record their provenance locally.
 
 ## Environment
@@ -88,7 +86,7 @@ pip install -r requirements.txt
 Place the Elliptic assets under `data/elliptic/`. See [`REPRODUCE.md`](REPRODUCE.md)
 for the required paths and checkpoint layout.
 
-## Main final workflow
+## Main paper workflow
 
 First audit the 36-run Shared DeepSets VAL-only sweep:
 
@@ -97,14 +95,14 @@ CUDA_VISIBLE_DEVICES=0 python scripts/run_deepsets_val_only_gpu.py --dry-run
 CUDA_VISIBLE_DEVICES=0 python scripts/run_deepsets_val_only_gpu.py
 ```
 
-After freezing the selected configuration, run final two-stage retraining and
+Once the selected configuration is frozen, run two-stage retraining and
 the matched eight-setting evaluation:
 
 ```bash
 CUDA_VISIBLE_DEVICES=0 python scripts/run_final_revfilter_saif_main.py
 ```
 
-The final launcher writes to:
+The main launcher writes to:
 
 ```text
 checkpoints/final_revfilter_saif_128_l1_d0p3/
@@ -145,17 +143,16 @@ configuration and checkpoint hashes are checked before collection. Detailed
 commands, expected record counts, integrity gates, output paths, and artifact
 retention requirements are consolidated in [`REPRODUCE.md`](REPRODUCE.md).
 
-## Legacy workflows
+## Additional workflows
 
-The initial top-k, sparsity, complexity, case-study, and batch wrappers remain
+Additional top-k, sparsity, complexity, case-study, and batch wrappers are
 available. List them with:
 
 ```bash
 python scripts/run_batches.py list
 ```
 
-They are retained for compatibility; the `run_final_*` launchers above define
-the frozen final protocol.
+The `run_final_*` launchers above define the frozen paper protocol.
 
 ## License
 

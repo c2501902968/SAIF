@@ -1,7 +1,7 @@
-# Reproduce the final SAIF experiments
+# Reproduce the SAIF experiments
 
 This document describes the frozen `128/1/0.3/max/ELU` workflow. It separates
-validation-only model selection, final retraining, TEST evaluation, and
+validation-only model selection, frozen retraining, TEST evaluation, and
 supporting controls so that TEST results cannot influence model choice.
 
 ## 1. Clone and install
@@ -15,9 +15,9 @@ pip install -r requirements.txt
 ```
 
 The recorded formal environment was Python 3.12.3, PyTorch 2.5.1+cu124, CUDA
-12.4, and an NVIDIA RTX 4090. Every final launcher writes its own environment
-record, so a compatible CUDA environment may be used without silently claiming
-the reference environment.
+12.4, and an NVIDIA RTX 4090. Every paper-experiment launcher writes its own
+environment record, so a compatible CUDA environment may be used without
+silently claiming the reference environment.
 
 ## 2. Data layout and split semantics
 
@@ -48,9 +48,9 @@ python scripts/audit_split_mask_provenance.py
 
 ## 3. VAL-only Shared DeepSets selection
 
-The final sweep contains 12 configurations and three seeds per configuration.
-It ranks configurations only by mean `validation/prauc`; its source scan rejects
-TEST-derived selection logic.
+The validation sweep contains 12 configurations and three seeds per
+configuration. It ranks configurations only by mean `validation/prauc`; its
+source scan rejects TEST-derived selection logic.
 
 ```bash
 CUDA_VISIBLE_DEVICES=0 python scripts/run_deepsets_val_only_gpu.py --dry-run
@@ -80,9 +80,9 @@ Relevant audit entrypoints are `audit_deepsets_provenance.py`,
 `audit_mlp_provenance.py`, `audit_ngcf_provenance.py`, and
 `audit_lightgcn_val_table1.py`.
 
-## 4. Final RevFilter and SAIF retraining
+## 4. Frozen RevFilter and SAIF retraining
 
-The final launcher freezes all model/search hyperparameters, trains RevFilter
+The main launcher freezes all model/search hyperparameters, trains RevFilter
 and full SAIF independently for seeds 0, 1, and 2 in two stages, and only then
 evaluates TEST. It is restartable and validates existing stage markers and
 checkpoint hashes before reusing them.
@@ -101,12 +101,12 @@ outputs/final_revfilter_saif_128_l1_d0p3/
 results/final_revfilter_saif_128_l1_d0p3/
 ```
 
-The final integrity audit must report:
+The integrity audit must report:
 
 ```text
 48 aggregate records
 12,288 instance records
-6 final stage-2 models
+6 stage-2 models
 candidate hash assertion = PASS
 TEST exclusion during training = PASS
 GPU assertion for 60 jobs = PASS
@@ -145,8 +145,8 @@ python -m unittest tests.test_paired_instance_wilcoxon_bh -v
 
 ## 6. Efficiency and receiver-balanced control
 
-These evaluations reuse the six frozen final stage-2 checkpoints and only run
-`10+1000@100` and `10+10000@100`.
+These evaluations reuse the six frozen paper-protocol stage-2 checkpoints and
+only run `10+1000@100` and `10+10000@100`.
 
 Verify the retained main-experiment artifacts first:
 
@@ -181,7 +181,7 @@ python scripts/run_final_efficiency_receiver_balanced.py \
   --phase efficiency --audit-only
 ```
 
-The efficiency audit requires 12/12 evaluations, exact final-checkpoint hashes,
+The efficiency audit requires 12/12 evaluations, exact checkpoint hashes,
 GPU/config assertions, and main-table HR/NDCG replication. It records:
 
 - exhaustive initial sender-receiver pairs;
@@ -241,9 +241,9 @@ Both phases use the two sparse settings, training seeds 0/1/2, evaluation seed
 0, and 256 matched instances per setting. TEST is disabled during training and
 is never used to select a checkpoint, pooling operator, seed, or result.
 
-Do not use the legacy `run_finetune_ablation.py` or
-`run_pooling_sensitivity.sh` for final-paper results; they do not enforce the
-frozen d0p3 provenance and complete matched-instance audit.
+Do not use `run_finetune_ablation.py` or `run_pooling_sensitivity.sh` for
+reported paper results; they do not enforce the frozen d0p3 provenance and
+complete matched-instance audit.
 
 ### 7.1 Two-factor component ablation
 
@@ -251,10 +251,10 @@ The confirmatory design crosses state conditioning with Stage-2 fine-tuning:
 
 | Variant | State/anchor features | Stage-2 fine-tuning | Checkpoint |
 |---|---:|---:|---|
-| RevFilter-S1 | off | off | final RevFilter Stage-1 |
-| RevFilter-S2 | off | on | final RevFilter Stage-2 |
-| SAIF-S1 | on | off | final SAIF Stage-1 |
-| Full-SAIF | on | on | final SAIF Stage-2 |
+| RevFilter-S1 | off | off | frozen RevFilter Stage-1 |
+| RevFilter-S2 | off | on | frozen RevFilter Stage-2 |
+| SAIF-S1 | on | off | frozen SAIF Stage-1 |
+| Full-SAIF | on | on | frozen SAIF Stage-2 |
 
 It reuses the frozen checkpoints and runs 24 evaluations. Four planned
 contrasts are tested for HR and NDCG in both settings, giving 16 paired tests in
@@ -290,8 +290,9 @@ multiple-testing family.
 
 ### 7.2 Pooling sensitivity
 
-Max pooling reuses the final checkpoints. Mean and sum pooling are trained from
-scratch under the same two-stage protocol, producing 24 new training stages:
+Max pooling reuses the frozen paper checkpoints. Mean and sum pooling are
+trained from scratch under the same two-stage protocol, producing 24 new
+training stages:
 
 ```text
 2 new pooling operators x 2 methods x 3 seeds x 2 stages = 24
@@ -366,24 +367,24 @@ results/final_candidate_order_robustness_128_l1_d0p3/order_hash_audit.csv
 results/final_candidate_order_robustness_128_l1_d0p3/integrity.json
 ```
 
-Re-running any final launcher resumes valid completed jobs. Do not retrain,
+Re-running any experiment launcher resumes valid completed jobs. Do not retrain,
 tune, select an order, or discard a seed based on these results.
 
-## 9. Legacy and exploratory workflows
+## 9. Additional and exploratory workflows
 
-The following scripts are retained for historical compatibility, but they are
-not substitutes for the audited `run_final_*` workflows:
+The following additional scripts are available, but they are not substitutes
+for the audited `run_final_*` workflows:
 
 - `run_targeted_ablation.py`: exploratory `full`, `no_finetune`, `size_only`,
   `no_density`, and `no_balance` comparison;
 - `run_finetune_ablation.py`: compact tuned-versus-no-fine-tuning comparison;
 - `train_no_layernorm.py` and `run_no_layernorm_ablation.py`: optional
   normalization control requiring new checkpoints;
-- `run_order_robustness.py`: original, less strictly audited order experiment;
-- `run_complexity_profile.py` and `summarize_complexity_profile.py`: legacy
+- `run_order_robustness.py`: a less strictly audited order experiment;
+- `run_complexity_profile.py` and `summarize_complexity_profile.py`: additional
   three-checkpoint complexity workflow.
 
-Legacy tasks and outputs can be listed with:
+Additional tasks and outputs can be listed with:
 
 ```bash
 python scripts/run_batches.py list
@@ -422,7 +423,7 @@ and environment snapshots are kept outside the source commit. Archive those
 artifacts together with their `integrity.json` and checkpoint SHA-256 records in
 a release or long-term research repository.
 
-For every final experiment retain the complete `results/` subdirectory,
+For every reported experiment retain the complete `results/` subdirectory,
 launcher log, resolved configs, per-instance CSV/JSONL, `environment.json`,
 `pip_freeze.txt`, checkpoint provenance, and `integrity.json`. Never synthesize
 a launcher log or resolved configuration after the run.
