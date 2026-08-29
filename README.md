@@ -142,12 +142,8 @@ CUDA_VISIBLE_DEVICES=0 python scripts/run_final_candidate_order_robustness.py
 
 These workflows are restartable: valid completed stages are reused, while
 configuration and checkpoint hashes are checked before collection. Detailed
-GPU instructions are available in:
-
-- [`SUPPORTING_GPU_RUN_INSTRUCTIONS.md`](SUPPORTING_GPU_RUN_INSTRUCTIONS.md)
-- [`ABLATION_POOLING_GPU_RUN_INSTRUCTIONS.md`](ABLATION_POOLING_GPU_RUN_INSTRUCTIONS.md)
-- [`CANDIDATE_ORDER_GPU_RUN_INSTRUCTIONS.md`](CANDIDATE_ORDER_GPU_RUN_INSTRUCTIONS.md)
-- [`FINAL_REPRODUCIBILITY_FILES.md`](FINAL_REPRODUCIBILITY_FILES.md)
+commands, expected record counts, integrity gates, output paths, and artifact
+retention requirements are consolidated in [`REPRODUCE.md`](REPRODUCE.md).
 
 ## Legacy workflows
 

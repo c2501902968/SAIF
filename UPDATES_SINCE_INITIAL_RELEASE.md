@@ -83,6 +83,5 @@ artifacts are intentionally excluded.
 
 - `README.md` now distinguishes legacy workflows from the frozen final protocol.
 - `REPRODUCE.md` provides the complete VAL-selection -> retraining -> evaluation
-  -> paired-statistics -> supporting-controls sequence.
-- Dedicated GPU instructions document efficiency/receiver-balanced, ablation/
-  pooling, and candidate-order experiments.
+  -> paired-statistics -> supporting-controls sequence, including all GPU
+  commands, integrity gates, output inventories, and runtime-provenance paths.

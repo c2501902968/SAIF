@@ -148,50 +148,273 @@ python -m unittest tests.test_paired_instance_wilcoxon_bh -v
 These evaluations reuse the six frozen final stage-2 checkpoints and only run
 `10+1000@100` and `10+10000@100`.
 
+Verify the retained main-experiment artifacts first:
+
 ```bash
-CUDA_VISIBLE_DEVICES=0 python scripts/run_final_efficiency_receiver_balanced.py --phase all --dry-run
-CUDA_VISIBLE_DEVICES=0 python scripts/run_final_efficiency_receiver_balanced.py --phase all
-CUDA_VISIBLE_DEVICES=0 python scripts/run_final_efficiency_receiver_balanced.py --phase all --audit-only
+test -f results/final_revfilter_saif_128_l1_d0p3/checkpoint_provenance.json
+test -f results/final_revfilter_saif_128_l1_d0p3/raw_48_run_records.csv
+test -f results/final_revfilter_saif_128_l1_d0p3/main_table_summary.csv
+for method in RevFilter SAIF; do
+  for seed in 0 1 2; do
+    test -f "checkpoints/final_revfilter_saif_128_l1_d0p3/${method}/seed${seed}_stage2.ckpt"
+  done
+done
 ```
 
-Efficiency compares actual scored regions and encoded nodes, not merely wall
-clock time. Receiver-balanced evaluation asserts identical receiver density
-across methods and writes direct official-versus-balanced delta comparisons.
+Run the configuration-only preflight:
+
+```bash
+CUDA_VISIBLE_DEVICES=0 python scripts/run_final_efficiency_receiver_balanced.py --phase all --dry-run
+```
+
+It must report two settings, three training seeds, and 12 planned evaluations
+for each phase.
+
+### 6.1 Efficiency
+
+```bash
+set -o pipefail
+CUDA_VISIBLE_DEVICES=0 python scripts/run_final_efficiency_receiver_balanced.py \
+  --phase efficiency 2>&1 | tee final_efficiency_128_l1_d0p3_launcher.log
+
+python scripts/run_final_efficiency_receiver_balanced.py \
+  --phase efficiency --audit-only
+```
+
+The efficiency audit requires 12/12 evaluations, exact final-checkpoint hashes,
+GPU/config assertions, and main-table HR/NDCG replication. It records:
+
+- exhaustive initial sender-receiver pairs;
+- split/filter and forward rounds;
+- scored regions and scored-region ratio;
+- encoded node tokens and represented edge volume;
+- maximum live regions and model parameters;
+- CUDA-synchronized search-loop time;
+- whole-process time including startup, loading, candidate construction, and
+  evaluation.
+
+The principal outputs are:
+
+```text
+results/final_efficiency_128_l1_d0p3/RESULTS.md
+results/final_efficiency_128_l1_d0p3/logs/complexity_profile_raw.csv
+results/final_efficiency_128_l1_d0p3/logs/complexity_profile_summary.csv
+results/final_efficiency_128_l1_d0p3/efficiency_comparison.csv
+results/final_efficiency_128_l1_d0p3/integrity.json
+```
+
+For interpretation, let `N = |S||R|`, `K` be the top-k budget, `alpha` the keep
+multiplier, and `T = ceil(log_4 N)` the maximum split depth. Exhaustive scoring
+is `O(N)`. After the first split, iterative search scores at most
+`O(alpha K T)` newly generated regions; the DeepSets work is proportional to
+the sum of sender and receiver nodes in those regions. SAIF adds a
+constant-dimensional state vector and therefore has the same asymptotic search
+order as RevFilter, with a constant scoring overhead.
+
+### 6.2 Receiver-balanced control
+
+```bash
+set -o pipefail
+CUDA_VISIBLE_DEVICES=0 python scripts/run_final_efficiency_receiver_balanced.py \
+  --phase receiver-balanced 2>&1 | tee final_receiver_balanced_128_l1_d0p3_launcher.log
+
+python scripts/run_final_efficiency_receiver_balanced.py \
+  --phase receiver-balanced --audit-only
+```
+
+The audit requires 12/12 evaluations, 3,072/3,072 instance records, identical
+candidate hashes across methods and checkpoints, identical receiver density,
+and four paired Wilcoxon tests with BH correction over the four-test family.
+
+Inspect:
+
+```bash
+cat results/final_receiver_balanced_128_l1_d0p3/receiver_balanced_summary.csv
+cat results/final_receiver_balanced_128_l1_d0p3/official_vs_receiver_balanced_deltas.csv
+cat results/final_receiver_balanced_128_l1_d0p3/paired_receiver_balanced_wilcoxon_bh_all4.md
+cat results/final_receiver_balanced_128_l1_d0p3/integrity.json
+```
 
 ## 7. Ablation and pooling sensitivity
 
-The ablation is a two-factor design over state conditioning and Stage-2
-fine-tuning. Pooling sensitivity compares max, mean, and sum while holding the
-rest of the architecture fixed.
+Both phases use the two sparse settings, training seeds 0/1/2, evaluation seed
+0, and 256 matched instances per setting. TEST is disabled during training and
+is never used to select a checkpoint, pooling operator, seed, or result.
+
+Do not use the legacy `run_finetune_ablation.py` or
+`run_pooling_sensitivity.sh` for final-paper results; they do not enforce the
+frozen d0p3 provenance and complete matched-instance audit.
+
+### 7.1 Two-factor component ablation
+
+The confirmatory design crosses state conditioning with Stage-2 fine-tuning:
+
+| Variant | State/anchor features | Stage-2 fine-tuning | Checkpoint |
+|---|---:|---:|---|
+| RevFilter-S1 | off | off | final RevFilter Stage-1 |
+| RevFilter-S2 | off | on | final RevFilter Stage-2 |
+| SAIF-S1 | on | off | final SAIF Stage-1 |
+| Full-SAIF | on | on | final SAIF Stage-2 |
+
+It reuses the frozen checkpoints and runs 24 evaluations. Four planned
+contrasts are tested for HR and NDCG in both settings, giving 16 paired tests in
+one BH family. Four additional difference-in-differences tests estimate the
+state-by-Stage-2 interaction in a separate BH family.
 
 ```bash
-CUDA_VISIBLE_DEVICES=0 python scripts/run_final_ablation_pooling.py --phase all --dry-run
-CUDA_VISIBLE_DEVICES=0 python scripts/run_final_ablation_pooling.py --phase ablation
-CUDA_VISIBLE_DEVICES=0 python scripts/run_final_ablation_pooling.py --phase pooling
-CUDA_VISIBLE_DEVICES=0 python scripts/run_final_ablation_pooling.py --phase all --audit-only
+CUDA_VISIBLE_DEVICES=0 python scripts/run_final_ablation_pooling.py \
+  --phase ablation --dry-run
+
+set -o pipefail
+CUDA_VISIBLE_DEVICES=0 python scripts/run_final_ablation_pooling.py \
+  --phase ablation 2>&1 | tee final_ablation_128_l1_d0p3_launcher.log
+
+CUDA_VISIBLE_DEVICES=0 python scripts/run_final_ablation_pooling.py \
+  --phase ablation --audit-only
 ```
 
-The collector writes both within-pooling SAIF-versus-RevFilter tests and direct
-interaction tests against max pooling. See
-[`ABLATION_POOLING_GPU_RUN_INSTRUCTIONS.md`](ABLATION_POOLING_GPU_RUN_INSTRUCTIONS.md).
+Required integrity counts are 24 evaluations, 6,144 instance records, 16
+planned paired tests, four interaction tests, and a passing candidate-hash
+assertion. Inspect:
+
+```text
+results/final_ablation_128_l1_d0p3/ablation_summary.csv
+results/final_ablation_128_l1_d0p3/ablation_planned_pairwise_wilcoxon_bh_all16.md
+results/final_ablation_128_l1_d0p3/ablation_interaction_wilcoxon_bh_all4.md
+results/final_ablation_128_l1_d0p3/integrity.json
+```
+
+Feature-group variants (`size_only`, `no_density`, `no_balance`) remain
+exploratory because they require new training and introduce a post-hoc
+multiple-testing family.
+
+### 7.2 Pooling sensitivity
+
+Max pooling reuses the final checkpoints. Mean and sum pooling are trained from
+scratch under the same two-stage protocol, producing 24 new training stages:
+
+```text
+2 new pooling operators x 2 methods x 3 seeds x 2 stages = 24
+```
+
+All max/mean/sum models are evaluated again in 36 jobs. The analysis contains
+12 within-pooling SAIF-versus-RevFilter tests and eight direct interactions of
+the form `(non-max SAIF effect) - (max SAIF effect)`. The interaction tests are
+the direct evidence for representation dependence.
+
+```bash
+CUDA_VISIBLE_DEVICES=0 python scripts/run_final_ablation_pooling.py \
+  --phase pooling --dry-run
+
+set -o pipefail
+CUDA_VISIBLE_DEVICES=0 python scripts/run_final_ablation_pooling.py \
+  --phase pooling 2>&1 | tee final_pooling_sensitivity_128_l1_d0p3_launcher.log
+
+CUDA_VISIBLE_DEVICES=0 python scripts/run_final_ablation_pooling.py \
+  --phase pooling --audit-only
+```
+
+Required integrity counts are 24 new training stages, 36 evaluations, 9,216
+instance records, 12 within-pooling tests, eight interaction tests, and a
+passing candidate-hash assertion. Inspect:
+
+```text
+results/final_pooling_sensitivity_128_l1_d0p3/pooling_summary.csv
+results/final_pooling_sensitivity_128_l1_d0p3/pooling_saif_vs_revfilter_wilcoxon_bh_all12.md
+results/final_pooling_sensitivity_128_l1_d0p3/pooling_interaction_vs_max_wilcoxon_bh_all8.md
+results/final_pooling_sensitivity_128_l1_d0p3/integrity.json
+checkpoints/final_pooling_sensitivity_128_l1_d0p3/
+```
 
 ## 8. Candidate-order robustness
 
 This defense experiment reuses the frozen checkpoints and matched main-table
-instances. Candidate membership stays fixed while sender and receiver order are
-independently shuffled with deterministic seeds.
+instances. It does not train or select a model. Candidate membership stays
+fixed while sender and receiver order are independently shuffled using seeds 1,
+2, and 3, alongside the original order.
+
+The full design contains 48 evaluations and 12,288 instance records:
+
+```text
+2 methods x 3 checkpoints x 2 settings x 4 orders = 48
+```
 
 ```bash
 CUDA_VISIBLE_DEVICES=0 python scripts/run_final_candidate_order_robustness.py --dry-run
-CUDA_VISIBLE_DEVICES=0 python scripts/run_final_candidate_order_robustness.py
+
+set -o pipefail
+CUDA_VISIBLE_DEVICES=0 python scripts/run_final_candidate_order_robustness.py \
+  2>&1 | tee final_candidate_order_robustness_128_l1_d0p3_launcher.log
+
 CUDA_VISIBLE_DEVICES=0 python scripts/run_final_candidate_order_robustness.py --audit-only
 ```
 
 The audit requires membership/positive-pair hashes to remain invariant and
-order hashes to change for shuffled conditions. See
-[`CANDIDATE_ORDER_GPU_RUN_INSTRUCTIONS.md`](CANDIDATE_ORDER_GPU_RUN_INSTRUCTIONS.md).
+order hashes to change for shuffled conditions. It also checks matched order
+across methods and training seeds, main-table replication under original order,
+GPU/config assertions, checkpoint provenance, and absence of TEST-derived
+selection.
 
-## 9. What is and is not versioned
+Inspect:
+
+```text
+results/final_candidate_order_robustness_128_l1_d0p3/candidate_order_summary.csv
+results/final_candidate_order_robustness_128_l1_d0p3/candidate_order_delta_summary.csv
+results/final_candidate_order_robustness_128_l1_d0p3/candidate_order_saif_vs_revfilter_wilcoxon_bh_all16.md
+results/final_candidate_order_robustness_128_l1_d0p3/candidate_order_interaction_wilcoxon_bh_all12.md
+results/final_candidate_order_robustness_128_l1_d0p3/order_hash_audit.csv
+results/final_candidate_order_robustness_128_l1_d0p3/integrity.json
+```
+
+Re-running any final launcher resumes valid completed jobs. Do not retrain,
+tune, select an order, or discard a seed based on these results.
+
+## 9. Legacy and exploratory workflows
+
+The following scripts are retained for historical compatibility, but they are
+not substitutes for the audited `run_final_*` workflows:
+
+- `run_targeted_ablation.py`: exploratory `full`, `no_finetune`, `size_only`,
+  `no_density`, and `no_balance` comparison;
+- `run_finetune_ablation.py`: compact tuned-versus-no-fine-tuning comparison;
+- `train_no_layernorm.py` and `run_no_layernorm_ablation.py`: optional
+  normalization control requiring new checkpoints;
+- `run_order_robustness.py`: original, less strictly audited order experiment;
+- `run_complexity_profile.py` and `summarize_complexity_profile.py`: legacy
+  three-checkpoint complexity workflow.
+
+Legacy tasks and outputs can be listed with:
+
+```bash
+python scripts/run_batches.py list
+```
+
+## 10. Runtime provenance and artifact retention
+
+Files under `reproducibility/` are frozen protocol manifests, not
+runtime-resolved Hydra configurations. Preserve the actual `.hydra/config.yaml`
+and log from each cloud job as authoritative execution provenance.
+
+Training:
+
+```text
+outputs/final_revfilter_saif_128_l1_d0p3/training/{RevFilter|SAIF}/seed{0|1|2}/{stage1|stage2}/.hydra/config.yaml
+outputs/final_revfilter_saif_128_l1_d0p3/training/{RevFilter|SAIF}/seed{0|1|2}/{stage1|stage2}/training.log
+```
+
+Main evaluation:
+
+```text
+outputs/final_revfilter_saif_128_l1_d0p3/evaluation/{RevFilter|SAIF}/seed{0|1|2}/{setting_tag}/.hydra/config.yaml
+outputs/final_revfilter_saif_128_l1_d0p3/evaluation/{RevFilter|SAIF}/seed{0|1|2}/{setting_tag}/evaluation.log
+```
+
+Receiver-balanced and candidate-order controls:
+
+```text
+outputs/final_receiver_balanced_128_l1_d0p3/{RevFilter|SAIF}/seed{0|1|2}/{setting_tag}/.hydra/config.yaml
+outputs/final_candidate_order_robustness_128_l1_d0p3/{RevFilter|SAIF}/seed{0|1|2}/{original|shuffle_1|shuffle_2|shuffle_3}/{setting_tag}/.hydra/config.yaml
+```
 
 Source code, configs, tests, and protocol manifests are versioned. Generated
 checkpoints, full Hydra outputs, launcher logs, instance-level result bundles,
@@ -199,5 +422,7 @@ and environment snapshots are kept outside the source commit. Archive those
 artifacts together with their `integrity.json` and checkpoint SHA-256 records in
 a release or long-term research repository.
 
-The exact handoff inventory is documented in
-[`FINAL_REPRODUCIBILITY_FILES.md`](FINAL_REPRODUCIBILITY_FILES.md).
+For every final experiment retain the complete `results/` subdirectory,
+launcher log, resolved configs, per-instance CSV/JSONL, `environment.json`,
+`pip_freeze.txt`, checkpoint provenance, and `integrity.json`. Never synthesize
+a launcher log or resolved configuration after the run.
