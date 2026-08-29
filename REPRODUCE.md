@@ -1,5 +1,9 @@
 # Reproduce the SAIF experiments
 
+SAIF conditions each candidate-region score on a structural summary of the
+region's current state within iterative filtering. This is the terminology used
+throughout the paper and the reproduction workflow below.
+
 This document describes the frozen `128/1/0.3/max/ELU` workflow. It separates
 validation-only model selection, frozen retraining, TEST evaluation, and
 supporting controls so that TEST results cannot influence model choice.

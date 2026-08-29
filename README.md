@@ -1,8 +1,9 @@
 # SAIF
 
-SAIF is a state-aware, anchor-conditioned extension of RevFilter-style
-subgraph recommendation for anti-money-laundering analysis on blockchain
-transaction graphs.
+SAIF is a candidate-region search-state conditioning method for RevFilter-style
+subgraph recommendation in anti-money-laundering analysis on blockchain
+transaction graphs. It conditions each candidate-region score on a structural
+summary of that region's current state within the iterative search.
 
 This repository provides the model implementation and reproducibility workflows
 used for the paper, including frozen model selection, training, evaluation,
@@ -30,9 +31,10 @@ Machine-readable specifications are under [`reproducibility/`](reproducibility/)
 
 ## Implemented components
 
-1. **Anchor-conditioned representation.** The SAIF scorer now supports six
-   anchor/state features, feature-group variants, LayerNorm, and deterministic
-   zero/shuffle/random controls.
+1. **Candidate-region search-state conditioning.** The SAIF scorer combines the
+   candidate-region representation with a six-dimensional structural summary
+   of its current search state. Feature-group variants, LayerNorm, and
+   deterministic zero/shuffle/random controls support the component analyses.
 2. **Matched evaluation.** The evaluator distinguishes positive pairs
    from positive endpoints, exports per-instance HR/NDCG, and supports official,
    symmetric, and receiver-balanced candidate pools.
