@@ -12,7 +12,7 @@ from tqdm import tqdm
 import pandas as pd
 from omegaconf import DictConfig
 from utils.print_utils import cyan
-from .data import SenderToReceiverData, candidate_density
+from .data import SenderToReceiverData
 
 
 class EllipticDataset(InMemoryDataset):
@@ -33,13 +33,8 @@ class EllipticDataset(InMemoryDataset):
         return ["emb.pt", "mask.pt", "data.pt"]
 
     def download(self):
-        # A released processed-only bundle can be loaded without the optional
-        # upstream raw embedding file. Processing still requires all raw files.
-        if all(fs.exists(path) for path in self.processed_paths):
-            return
-        raise NotImplementedError(
-            "Raw Elliptic files are incomplete and automatic download is unavailable"
-        )
+        # TODO: implement download from url
+        raise NotImplementedError
 
     def process(self):
         print(cyan("Processing Elliptic dataset..."))
@@ -127,14 +122,16 @@ class EllipticRecommendationEvalDataset(Dataset):
             data_list.append(self._generate_sample())
         self.data_list = data_list
         print(f"Avg density: {self.density:.4f}")
-        print("using distinct ground-truth positive pairs in each candidate instance")
+        print(
+            f"which is {self.num_illicits} illicit edges out of {self.num_illicits / self.density:.1f} possible edges"
+        )
         print(cyan("Done generating Elliptic recommendation evaluation dataset!"))
 
     @cached_property
     def density(self):
         density = [
-            candidate_density(senders, receivers, positive_edges)
-            for senders, receivers, positive_edges in self.data_list
+            self.num_illicits / (senders.size(0) * receivers.size(0))
+            for senders, receivers, _ in self.data_list
         ]
         return sum(density) / len(density)
 

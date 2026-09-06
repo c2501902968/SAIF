@@ -18,17 +18,15 @@ def recompute_batch_size(cfg: DictConfig):
     (e.g. for a batch size of 64, and 4 gpus, the batch size per gpu will be 16)
     """
     num_gpus = torch.cuda.device_count()
-    num_devices = max(1, num_gpus)
 
     def get_new_batch_size(batch_size: int):
         if batch_size == -1:
             return -1
-        if batch_size % num_devices != 0:
+        if batch_size % num_gpus != 0:
             raise ValueError(
-                f"Effective batch size ({batch_size}) must be divisible by the "
-                f"number of active devices ({num_devices})"
+                f"Effective batch size ({batch_size}) must be divisible by the number of gpus ({num_gpus})"
             )
-        return batch_size // num_devices
+        return batch_size // num_gpus
 
     cfg.experiment.training.batch_size = get_new_batch_size(
         cfg.experiment.training.batch_size

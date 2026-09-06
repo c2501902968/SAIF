@@ -76,7 +76,7 @@ class SubgraphClassificationExperiment(BaseLightningExperiment):
                 ),
                 num_workers=min(os.cpu_count(), self.cfg.training.data.num_workers),
                 shuffle=shuffle,
-                persistent_workers=self.cfg.training.data.num_workers > 0,
+                persistent_workers=True,
                 follow_batch=["senders", "receivers"],
             )
         else:
@@ -101,7 +101,7 @@ class SubgraphClassificationExperiment(BaseLightningExperiment):
                 ),
                 num_workers=min(os.cpu_count(), self.cfg.validation.data.num_workers),
                 shuffle=shuffle,
-                persistent_workers=self.cfg.validation.data.num_workers > 0,
+                persistent_workers=True,
                 follow_batch=["senders", "receivers"],
             )
         else:
@@ -126,7 +126,7 @@ class SubgraphClassificationExperiment(BaseLightningExperiment):
                 ),
                 num_workers=min(os.cpu_count(), self.cfg.test.data.num_workers),
                 shuffle=shuffle,
-                persistent_workers=self.cfg.test.data.num_workers > 0,
+                persistent_workers=True,
                 follow_batch=["senders", "receivers"],
             )
         else:

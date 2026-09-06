@@ -48,12 +48,10 @@ def run_local(cfg: DictConfig):
     output_dir = Path(hydra_cfg.runtime.output_dir)
     if is_rank_zero:
         print(cyan(f"Outputs will be saved to:"), output_dir)
-        latest_run = output_dir.parents[1] / "latest-run"
-        latest_run.unlink(missing_ok=True)
-        try:
-            latest_run.symlink_to(output_dir, target_is_directory=True)
-        except OSError as exc:
-            print(f"Skipping latest-run symlink: {exc}")
+        (output_dir.parents[1] / "latest-run").unlink(missing_ok=True)
+        (output_dir.parents[1] / "latest-run").symlink_to(
+            output_dir, target_is_directory=True
+        )
 
     # Set up logging with wandb.
     if cfg.wandb.mode != "disabled":

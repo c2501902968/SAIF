@@ -35,16 +35,6 @@ class AnchorAwareDoubleDeepSets(nn.Module):
         self.cfg = cfg
         self.anchor_feature_mode = getattr(cfg, "anchor_feature_mode", "full")
         self.anchor_normalization = getattr(cfg, "anchor_normalization", "layernorm")
-        self.anchor_control_mode = getattr(cfg, "anchor_control_mode", "normal")
-        self.anchor_input_dim = int(
-            getattr(
-                cfg,
-                "anchor_input_dim",
-                self.anchor_feature_dims[self.anchor_feature_mode],
-            )
-        )
-        if self.anchor_control_mode not in {"normal", "zero", "shuffle", "random"}:
-            raise ValueError("anchor_control_mode must be normal/zero/shuffle/random")
         if self.anchor_feature_mode not in self.anchor_feature_dims:
             raise ValueError(
                 f"Unknown anchor_feature_mode={self.anchor_feature_mode}; "
@@ -55,9 +45,7 @@ class AnchorAwareDoubleDeepSets(nn.Module):
                 f"Unknown anchor_normalization={self.anchor_normalization}; "
                 "expected 'layernorm' or 'none'."
             )
-        if self.anchor_control_mode in {"normal", "shuffle"} and self.anchor_input_dim != self.anchor_feature_dims[self.anchor_feature_mode]:
-            raise ValueError("normal/shuffle controls require the semantic feature dimension")
-        self.anchor_feature_dim = self.anchor_input_dim
+        self.anchor_feature_dim = self.anchor_feature_dims[self.anchor_feature_mode]
         self._build_model()
 
     def _build_model(self):
@@ -130,22 +118,7 @@ class AnchorAwareDoubleDeepSets(nn.Module):
         receivers = self.feature_encoder(receivers)
         senders = self.sender_deep_sets(senders, senders_batch)
         receivers = self.receiver_deep_sets(receivers, receivers_batch)
-        if self.anchor_feature_dim == self.anchor_feature_dims[self.anchor_feature_mode]:
-            anchors_raw = self._anchor_features(
-                senders_batch, receivers_batch, batch_size
-            )
-        else:
-            anchors_raw = torch.zeros(
-                (batch_size, self.anchor_feature_dim), device=senders.device
-            )
-        anchors = self.anchor_norm(anchors_raw)
-        # Controls are deliberately applied after normalization, matching the
-        # original five-seed controls and preventing LayerNorm affine terms
-        # from turning the zero control into a learned constant input.
-        if self.anchor_control_mode == "zero":
-            anchors = torch.zeros_like(anchors)
-        elif self.anchor_control_mode == "random":
-            anchors = torch.randn_like(anchors)
-        elif self.anchor_control_mode == "shuffle":
-            anchors = anchors[torch.randperm(batch_size, device=anchors.device)]
+        anchors = self.anchor_norm(
+            self._anchor_features(senders_batch, receivers_batch, batch_size)
+        )
         return self.pred_mlp(torch.cat([senders, receivers, anchors], dim=-1))

@@ -27,7 +27,7 @@
 
 This is the official repository for the paper [**_Identifying Money Laundering Subgraphs on the Blockchain_**](https://arxiv.org/abs/2410.08394). We provide the code for _RevTrack_, _RevClassify_, and _RevFilter_, together with the code for the experiments in the paper and model checkpoints. See the instructions below.
 
-![plot](../figures/RevTrack.png)
+![plot](figures/RevTrack.png)
 
 ```
 @inproceedings{song2024revtrack,

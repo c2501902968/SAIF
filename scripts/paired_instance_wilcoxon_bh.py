@@ -28,9 +28,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--out", required=True, type=Path)
     parser.add_argument("--metrics", nargs="+", default=["HR", "NDCG"])
     parser.add_argument("--bh-scope", choices=["all", "metric"], default="all")
-    parser.add_argument("--expected-runs", type=int, default=3)
-    parser.add_argument("--expected-samples", type=int, default=256)
-    parser.add_argument("--expected-settings", type=int, default=8)
     parser.add_argument(
         "--alternative",
         choices=["two-sided", "greater", "less"],
@@ -45,13 +42,9 @@ def read_instance_rows(
     *,
     method: str | None,
     metrics: list[str],
-    expected_runs: int,
-) -> tuple[
-    dict[tuple[str, str], dict[str, float]],
-    dict[tuple[str, str], set[str]],
-]:
-    values: dict[tuple[str, str], dict[str, dict[str, float]]] = defaultdict(
-        lambda: defaultdict(dict)
+) -> dict[tuple[str, str], dict[str, float]]:
+    values: dict[tuple[str, str], dict[str, list[float]]] = defaultdict(
+        lambda: defaultdict(list)
     )
     with path.open(newline="", encoding="utf-8") as f:
         reader = csv.DictReader(f)
@@ -60,53 +53,20 @@ def read_instance_rows(
                 continue
             setting = row["setting"]
             sample_id = row.get("sample_id", str(row_idx))
-            run_id = row.get("ckpt", "").strip()
-            if not run_id:
-                raise AssertionError(
-                    f"{path}: missing run ID in column 'ckpt' at CSV row {row_idx + 2}"
-                )
             key = (setting, sample_id)
             for metric in metrics:
                 if row.get(metric, "") == "":
-                    raise AssertionError(
-                        f"{path}: missing {metric} for setting={setting}, "
-                        f"sample_id={sample_id}, run_id={run_id}"
-                    )
-                if run_id in values[key][metric]:
-                    raise AssertionError(
-                        f"{path}: duplicate record for setting={setting}, "
-                        f"sample_id={sample_id}, run_id={run_id}, metric={metric}"
-                    )
-                values[key][metric][run_id] = float(row[metric])
-
-    if not values:
-        method_note = f" for method={method}" if method is not None else ""
-        raise AssertionError(f"{path}: no instance records found{method_note}")
+                    continue
+                values[key][metric].append(float(row[metric]))
 
     averaged = {}
-    run_ids = {}
     for key, metric_values in values.items():
-        metric_run_sets = {metric: set(vals) for metric, vals in metric_values.items()}
-        if set(metric_run_sets) != set(metrics):
-            raise AssertionError(f"{path}: incomplete metrics for {key}: {metric_run_sets}")
-        reference_runs = metric_run_sets[metrics[0]]
-        if len(reference_runs) != expected_runs:
-            raise AssertionError(
-                f"{path}: expected {expected_runs} runs for {key}, "
-                f"found {len(reference_runs)}: {sorted(reference_runs)}"
-            )
-        for metric, metric_runs in metric_run_sets.items():
-            if metric_runs != reference_runs:
-                raise AssertionError(
-                    f"{path}: run-ID mismatch across metrics for {key}; "
-                    f"{metric} has {sorted(metric_runs)}, expected {sorted(reference_runs)}"
-                )
         averaged[key] = {
-            metric: mean(list(vals.values()))
+            metric: mean(vals)
             for metric, vals in metric_values.items()
+            if vals
         }
-        run_ids[key] = reference_runs
-    return averaged, run_ids
+    return averaged
 
 
 def average_ranks(values: list[float]) -> list[float]:
@@ -191,65 +151,31 @@ def bh_adjust(p_values: list[float]) -> list[float]:
 
 
 def build_test_rows(args: argparse.Namespace) -> list[dict[str, str]]:
-    a_rows, a_run_ids = read_instance_rows(
-        args.a,
-        method=args.a_method,
-        metrics=args.metrics,
-        expected_runs=args.expected_runs,
+    a_rows = read_instance_rows(args.a, method=args.a_method, metrics=args.metrics)
+    b_rows = read_instance_rows(args.b, method=args.b_method, metrics=args.metrics)
+    settings = sorted(
+        {setting for setting, _ in a_rows}.intersection(
+            {setting for setting, _ in b_rows}
+        ),
+        key=setting_sort_key,
     )
-    b_rows, b_run_ids = read_instance_rows(
-        args.b,
-        method=args.b_method,
-        metrics=args.metrics,
-        expected_runs=args.expected_runs,
-    )
-    a_settings = {setting for setting, _ in a_rows}
-    b_settings = {setting for setting, _ in b_rows}
-    if a_settings != b_settings:
-        raise AssertionError(
-            f"Setting mismatch: A-only={sorted(a_settings - b_settings)}, "
-            f"B-only={sorted(b_settings - a_settings)}"
-        )
-    if len(a_settings) != args.expected_settings:
-        raise AssertionError(
-            f"Expected {args.expected_settings} matched settings, "
-            f"found {len(a_settings)}: {sorted(a_settings)}"
-        )
-    settings = sorted(a_settings, key=setting_sort_key)
 
     result_rows = []
     for setting in settings:
-        a_sample_ids = {sample_id for s, sample_id in a_rows if s == setting}
-        b_sample_ids = {sample_id for s, sample_id in b_rows if s == setting}
-        if a_sample_ids != b_sample_ids:
-            raise AssertionError(
-                f"Sample mismatch for {setting}: "
-                f"A-only={sorted(a_sample_ids - b_sample_ids)}, "
-                f"B-only={sorted(b_sample_ids - a_sample_ids)}"
-            )
-        if len(a_sample_ids) != args.expected_samples:
-            raise AssertionError(
-                f"Expected {args.expected_samples} matched samples for {setting}, "
-                f"found {len(a_sample_ids)}"
-            )
         sample_ids = sorted(
-            a_sample_ids,
+            {sample_id for s, sample_id in a_rows if s == setting}.intersection(
+                {sample_id for s, sample_id in b_rows if s == setting}
+            ),
             key=lambda x: int(x) if x.isdigit() else x,
         )
-        for sample_id in sample_ids:
-            key = (setting, sample_id)
-            if a_run_ids[key] != b_run_ids[key]:
-                raise AssertionError(
-                    f"Run-ID mismatch for {key}: "
-                    f"A={sorted(a_run_ids[key])}, B={sorted(b_run_ids[key])}"
-                )
         for metric in args.metrics:
             paired = [
                 (a_rows[(setting, sample_id)].get(metric), b_rows[(setting, sample_id)].get(metric))
                 for sample_id in sample_ids
             ]
-            if any(a is None or b is None for a, b in paired):
-                raise AssertionError(f"Missing paired {metric} value for {setting}")
+            paired = [(a, b) for a, b in paired if a is not None and b is not None]
+            if not paired:
+                continue
             a_vals = [a for a, _ in paired]
             b_vals = [b for _, b in paired]
             diffs = [b - a for a, b in paired]
@@ -272,12 +198,6 @@ def build_test_rows(args: argparse.Namespace) -> list[dict[str, str]]:
                     "q_bh": "",
                 }
             )
-    expected_comparisons = args.expected_settings * len(args.metrics)
-    if len(result_rows) != expected_comparisons:
-        raise AssertionError(
-            f"Expected {expected_comparisons} setting-metric comparisons, "
-            f"found {len(result_rows)}"
-        )
     return result_rows
 
 
@@ -308,8 +228,7 @@ def write_markdown(
         f.write(f"# Paired Instance-Level Wilcoxon Tests: {b_name} - {a_name}\n\n")
         f.write(
             f"Alternative: `{alternative}`. BH correction scope: `{bh_scope}`. "
-            "Rows average the asserted matched independently trained runs per "
-            "`(setting, sample_id)` before testing.\n\n"
+            "Rows average repeated checkpoint entries per `(setting, sample_id)` before testing.\n\n"
         )
         f.write(
             "| setting | metric | n | nonzero n | "

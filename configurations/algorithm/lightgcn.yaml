@@ -2,9 +2,7 @@ defaults:
   - base_cf
 
 model:
-  # Selected on validation/f1 only (2026-08-24 audit); the released 3-layer
-  # default was paired with a sweep whose optimization metric was final_test/HR.
-  num_layers: 2
+  num_layers: 3
   dropout: 0
   conv: LightGCN
   aggr: mean

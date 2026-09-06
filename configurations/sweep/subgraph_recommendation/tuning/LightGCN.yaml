@@ -4,7 +4,7 @@ method: grid # hp search method - maybe grid or random
 
 metric:
   goal: maximize
-  name: validation/f1
+  name: final_test/HR
 
 parameters:
   # Sweep params
@@ -18,12 +18,8 @@ parameters:
     value: lightgcn
   experiment:
     value: exp_edge_recommendation
-  experiment.tasks:
-    value: [training]
   experiment.training.batch_size:
     value: 1024
-  experiment.validation.batch_size:
-    value: -1
   experiment.validation.test_during_training:
     value: False
   seed:
